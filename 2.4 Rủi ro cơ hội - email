@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trợ Lý Gợi Ý Thảo Luận</title>
+    <!-- Tải Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tải thư viện Marked.js để render Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        /* Sử dụng font Inter cho toàn bộ trang */
+        body {
+            font-family: "Inter", sans-serif;
+            background-color: #f8f9fa;
+        }
+        /* Tùy chỉnh thanh cuộn cho đẹp hơn */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        /* CSS cho spinner loading */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #10b981; /* Màu xanh lá cây của Tailwind: emerald-500 */
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Tùy chỉnh cho khu vực output */
+        #output-container {
+            min-height: 150px;
+            padding: 1.5rem;
+            background-color: #ffffff;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+        /* Kiểu cho thẻ H3 trong output */
+        #output-container h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 0.25rem;
+        }
+        /* Kiểu cho danh sách (ul/ol) trong output */
+        #output-container ul, #output-container ol {
+            padding-left: 1.5rem;
+            list-style: disc;
+        }
+        #output-container li {
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div class="max-w-4xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-gray-800 tracking-tight">Trợ Lý Phân Tích <span class="text-emerald-500">Cuộc Họp</span></h1>
+            <p class="text-gray-500 mt-2">Phân tích biên bản họp và tạo các điểm thảo luận, tóm tắt, agenda, hành động hoặc email tổng kết.</p>
+        </header>
+
+        <section class="bg-white p-6 rounded-xl shadow-lg mb-8">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">1. Nhập Biên Bản/Nội Dung Cuộc Họp</h2>
+            <textarea id="meeting-notes" rows="10" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 transition duration-150 ease-in-out resize-none" placeholder="Dán toàn bộ nội dung cuộc họp hoặc các vấn đề cần thảo luận vào đây..."></textarea>
+            
+            <div class="mt-4 flex flex-wrap gap-3">
+                <button id="generate-discussion-button" class="px-6 py-3 bg-emerald-600 text-white font-bold rounded-lg shadow-md hover:bg-emerald-700 transition duration-150 ease-in-out flex items-center justify-center disabled:opacity-50" onclick="generateDiscussionPoints()">
+                    <span id="discussion-button-text">Phân Tích & Gợi Ý Thảo Luận</span>
+                    <div id="discussion-loading-spinner" class="loader hidden ml-3 w-4 h-4"></div>
+                </button>
+
+                <!-- FEATURE 2: Summary -->
+                <button id="generate-summary-button" class="px-4 py-3 bg-fuchsia-600 text-white font-bold rounded-lg shadow-md hover:bg-fuchsia-700 transition duration-150 ease-in-out flex items-center justify-center disabled:opacity-50" onclick="generateSummary()">
+                    <span id="summary-button-text">✨ Tóm Tắt Nhanh (1 Đoạn)</span>
+                    <div id="summary-loading-spinner" class="loader hidden ml-3 w-4 h-4"></div>
+                </button>
+
+                <!-- FEATURE 3: Agenda Draft -->
+                <button id="generate-agenda-button" class="px-4 py-3 bg-sky-600 text-white font-bold rounded-lg shadow-md hover:bg-sky-700 transition duration-150 ease-in-out flex items-center justify-center disabled:opacity-50" onclick="generateAgendaDraft()">
+                    <span id="agenda-button-text">✨ Đề Xuất Agenda Mẫu</span>
+                    <div id="agenda-loading-spinner" class="loader hidden ml-3 w-4 h-4"></div>
+                </button>
+                
+                <!-- FEATURE 4: Action Item Extraction -->
+                <button id="generate-action-button" class="px-4 py-3 bg-orange-600 text-white font-bold rounded-lg shadow-md hover:bg-orange-700 transition duration-150 ease-in-out flex items-center justify-center disabled:opacity-50" onclick="generateActionItems()">
+                    <span id="action-button-text">✨ Trích Xuất Hành Động & Người Phụ Trách</span>
+                    <div id="action-loading-spinner" class="loader hidden ml-3 w-4 h-4" style="border-top-color: #ea580c;"></div>
+                </button>
+
+                <!-- FEATURE 5: Follow-up Email Draft -->
+                <button id="generate-email-button" class="px-4 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 ease-in-out flex items-center justify-center disabled:opacity-50" onclick="generateFollowupEmail()">
+                    <span id="email-button-text">✨ Soạn Thảo Email Tóm Tắt</span>
+                    <div id="email-loading-spinner" class="loader hidden ml-3 w-4 h-4" style="border-top-color: #4f46e5;"></div>
+                </button>
+                
+                <!-- NEW FEATURE 6: Risk & Opportunity Analysis -->
+                <button id="generate-risk-button" class="px-4 py-3 bg-teal-600 text-white font-bold rounded-lg shadow-md hover:bg-teal-700 transition duration-150 ease-in-out flex items-center justify-center disabled:opacity-50" onclick="analyzeRisksAndOpportunities()">
+                    <span id="risk-button-text">✨ Phân Tích Rủi Ro & Cơ Hội</span>
+                    <div id="risk-loading-spinner" class="loader hidden ml-3 w-4 h-4" style="border-top-color: #0d9488;"></div>
+                </button>
+
+            </div>
+        </section>
+
+        <section class="bg-white p-6 rounded-xl shadow-lg">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">2. Kết Quả Gợi Ý Thảo Luận / Phân Tích</h2>
+            
+            <!-- Message box cho lỗi và thông báo -->
+            <div id="message-box" class="hidden p-3 mb-4 rounded-lg text-sm" role="alert"></div>
+
+            <div id="output-container" class="rounded-lg bg-gray-50 text-gray-800 overflow-x-auto">
+                <p class="text-gray-500 italic">Kết quả sẽ xuất hiện ở đây sau khi bạn nhấn nút Phân Tích.</p>
+            </div>
+            
+            <button id="copy-button" class="mt-4 w-full sm:w-auto px-4 py-2 bg-blue-500 text-white font-medium rounded-lg shadow-md hover:bg-blue-600 transition duration-150 ease-in-out hidden" onclick="copyToClipboard()">
+                Sao chép Kết quả
+            </button>
+        </section>
+        
+        <footer class="mt-8 text-center text-sm text-gray-400">
+            Sử dụng Gemini API (gemini-2.5-flash-preview-09-2025) để phân tích văn bản và tạo cấu trúc JSON/Markdown.
+        </footer>
+    </div>
+
+    <script type="module">
+        // Khai báo các biến toàn cục cho Firebase và App ID
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const apiKey = ""; // API Key được cung cấp tự động trong Canvas
+        const MODEL_NAME = "gemini-2.5-flash-preview-09-2025";
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
+
+        // --- SCHEMAS ---
+
+        // Schema 1: Cấu hình JSON cho phản hồi (Chức năng Gợi Ý Thảo Luận)
+        const DISCUSSION_SCHEMA = {
+            type: "OBJECT",
+            properties: {
+                main_topics: {
+                    type: "ARRAY",
+                    description: "Xác định các ý chính, góc nhìn hoặc vấn đề trọng tâm bao quát toàn bộ nội dung.",
+                    items: {
+                        type: "STRING"
+                    }
+                },
+                discussion_groups: {
+                    type: "ARRAY",
+                    description: "Tập hợp các gợi ý thảo luận theo từng nhóm vấn đề lớn.",
+                    items: {
+                        type: "OBJECT",
+                        properties: {
+                            group_title: {
+                                type: "STRING",
+                                description: "Tiêu đề của nhóm vấn đề (ví dụ: Quản lý Cộng tác viên, Chuyển đổi số, Công tác Đảng)."
+                            },
+                            points: {
+                                type: "ARRAY",
+                                description: "Danh sách 3-5 gợi ý thảo luận cho nhóm vấn đề này.",
+                                items: {
+                                    type: "OBJECT",
+                                    properties: {
+                                        keyword: {
+                                            type: "STRING",
+                                            description: "Từ khóa hoặc ý chính ngắn gọn."
+                                        },
+                                        explanation: {
+                                            type: "STRING",
+                                            description: "Giải thích ngắn (chỉ 1 câu): Tại sao cần bàn luận điểm này."
+                                        }
+                                    },
+                                    propertyOrdering: ["keyword", "explanation"]
+                                }
+                            }
+                        },
+                        propertyOrdering: ["group_title", "points"]
+                    }
+                },
+                closing_prompt: {
+                    type: "STRING",
+                    description: "Một câu hỏi mở ở cuối để khuyến khích người dùng chọn hoặc mở rộng ý."
+                }
+            },
+            propertyOrdering: ["main_topics", "discussion_groups", "closing_prompt"]
+        };
+        
+        // Schema 2: Cấu hình JSON cho phản hồi (Chức năng Trích Xuất Hành Động)
+        const ACTION_ITEM_SCHEMA = {
+            type: "ARRAY",
+            description: "Danh sách các mục hành động được trích xuất từ biên bản họp.",
+            items: {
+                type: "OBJECT",
+                properties: {
+                    task: {
+                        type: "STRING",
+                        description: "Mô tả ngắn gọn về hành động cần thực hiện."
+                    },
+                    owner: {
+                        type: "STRING",
+                        description: "Người hoặc nhóm chịu trách nhiệm thực hiện hành động. Nếu không rõ, ghi là 'Chưa xác định'."
+                    },
+                    priority: {
+                        type: "STRING",
+                        description: "Đánh giá mức độ ưu tiên của hành động (Cao, Trung bình, Thấp)."
+                    }
+                },
+                propertyOrdering: ["task", "owner", "priority"]
+            }
+        };
+
+        // Schema 3: Cấu hình JSON cho phản hồi (Chức năng Rủi Ro & Cơ Hội)
+        const RISK_OPP_SCHEMA = {
+            type: "OBJECT",
+            properties: {
+                risks: {
+                    type: "ARRAY",
+                    description: "Danh sách 3-5 rủi ro hoặc thách thức tiềm ẩn được đề cập hoặc ngụ ý trong biên bản họp.",
+                    items: {
+                        type: "OBJECT",
+                        properties: {
+                            risk_description: {
+                                type: "STRING",
+                                description: "Mô tả ngắn gọn về rủi ro."
+                            },
+                            mitigation_suggestion: {
+                                type: "STRING",
+                                description: "Đề xuất ngắn gọn để giảm thiểu hoặc quản lý rủi ro này."
+                            }
+                        },
+                        propertyOrdering: ["risk_description", "mitigation_suggestion"]
+                    }
+                },
+                opportunities: {
+                    type: "ARRAY",
+                    description: "Danh sách 3-5 cơ hội tiềm năng hoặc bước tiếp theo tích cực được đề cập hoặc ngụ ý.",
+                    items: {
+                        type: "OBJECT",
+                        properties: {
+                            opportunity_description: {
+                                type: "STRING",
+                                description: "Mô tả ngắn gọn về cơ hội."
+                            },
+                            action_suggestion: {
+                                type: "STRING",
+                                description: "Đề xuất ngắn gọn để khai thác cơ hội này."
+                            }
+                        },
+                        propertyOrdering: ["opportunity_description", "action_suggestion"]
+                    }
+                }
+            },
+            propertyOrdering: ["risks", "opportunities"]
+        };
+
+
+        // --- UTILITY FUNCTIONS ---
+
+        // Hàm hiển thị thông báo
+        function showMessage(message, type = 'error') {
+            const box = document.getElementById('message-box');
+            box.textContent = message;
+            box.className = `p-3 mb-4 rounded-lg text-sm transition-all duration-300 ${type === 'error' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`;
+            box.classList.remove('hidden');
+        }
+
+        // Hàm ẩn thông báo
+        function hideMessage() {
+            document.getElementById('message-box').classList.add('hidden');
+        }
+
+        // Hàm thay đổi trạng thái button và spinner
+        function setLoadingState(buttonId, isLoading, defaultText) {
+            const button = document.getElementById(buttonId);
+            const buttonText = button.querySelector('span');
+            const loadingSpinner = button.querySelector('.loader');
+
+            button.disabled = isLoading;
+            if (isLoading) {
+                buttonText.textContent = 'Đang Xử Lý...';
+                loadingSpinner.classList.remove('hidden');
+            } else {
+                buttonText.textContent = defaultText;
+                loadingSpinner.classList.add('hidden');
+            }
+        }
+
+
+        // Hàm gọi API và xử lý Retry (cho JSON response)
+        async function callGeminiApiJson(userPrompt, responseSchema, systemPrompt) {
+            return await callGeminiApi(userPrompt, systemPrompt, responseSchema);
+        }
+
+        // Hàm gọi API và xử lý Retry (cho TEXT response)
+        async function callGeminiApiText(userPrompt, systemPrompt) {
+            return await callGeminiApi(userPrompt, systemPrompt, null);
+        }
+
+        // Hàm API gốc với logic retry chung
+        async function callGeminiApi(userPrompt, systemPrompt, responseSchema) {
+            const retries = 3;
+            let delay = 1000;
+            
+            const payload = {
+                contents: [{ parts: [{ text: userPrompt }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+
+            if (responseSchema) {
+                payload.generationConfig = {
+                    responseMimeType: "application/json",
+                    responseSchema: responseSchema
+                };
+            }
+
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const errorBody = await response.text();
+                        console.error("API Error Body:", errorBody);
+                        throw new Error(`Lỗi HTTP! status: ${response.status} - ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+                    const partText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    
+                    if (partText) {
+                        if (responseSchema) {
+                            try {
+                                return JSON.parse(partText);
+                            } catch (e) {
+                                console.error("Lỗi Parsing JSON:", partText);
+                                throw new Error('Phản hồi không phải là JSON hợp lệ.');
+                            }
+                        } else {
+                            return partText;
+                        }
+                    } else {
+                        throw new Error('Định dạng phản hồi API không hợp lệ hoặc nội dung trống.');
+                    }
+
+                } catch (error) {
+                    if (i === retries - 1) { 
+                        throw error; 
+                    }
+                    await new Promise(resolve => setTimeout(resolve, delay)); 
+                    delay *= 2; 
+                }
+            }
+        }
+
+
+        // --- FORMATTING FUNCTIONS ---
+
+        // Hàm chuyển đổi kết quả JSON (Gợi ý Thảo luận) thành chuỗi Markdown
+        function formatDiscussionResultToMarkdown(data) {
+            let markdown = `## 🎯 Phân Tích và Gợi Ý Thảo Luận Từ Biên Bản Hộp\n\n`;
+
+            // 1. Vấn đề Trọng tâm
+            if (data.main_topics && data.main_topics.length > 0) {
+                markdown += `### Vấn Đề Trọng Tâm (Ý Chính)\n`;
+                markdown += data.main_topics.map(topic => `- **${topic}**`).join('\n');
+                markdown += `\n\n`;
+            }
+
+            // 2. Nhóm Thảo Luận
+            if (data.discussion_groups && data.discussion_groups.length > 0) {
+                markdown += `## 💬 Các Nhóm Thảo Luận Chi Tiết\n\n`;
+                data.discussion_groups.forEach(group => {
+                    markdown += `### 📌 ${group.group_title}\n\n`;
+                    if (group.points && group.points.length > 0) {
+                        group.points.forEach((point, index) => {
+                            markdown += `**${index + 1}. ${point.keyword}**\n`;
+                            markdown += `> *Giải thích: ${point.explanation}*\n\n`;
+                        });
+                    }
+                });
+            }
+
+            // 3. Kết luận và Câu hỏi mở
+            if (data.closing_prompt) {
+                 markdown += `\n***\n`;
+                 markdown += `**Câu hỏi mở:** ${data.closing_prompt}`;
+            }
+
+            return markdown;
+        }
+        
+        // Hàm chuyển đổi kết quả JSON (Mục Hành Động) thành chuỗi Markdown
+        function formatActionItemsToMarkdown(data) {
+            if (!data || data.length === 0) {
+                return `## ✨ Danh Sách Hành Động Cần Thực Hiện\n\nKhông tìm thấy mục hành động nào rõ ràng trong biên bản.`;
+            }
+
+            let markdown = `## ✨ Danh Sách Hành Động Cần Thực Hiện\n\n`;
+            
+            data.forEach((item, index) => {
+                const priority = item.priority || 'Chưa rõ';
+                let priorityIcon = '⚪';
+                if (priority.toLowerCase().includes('cao')) {
+                    priorityIcon = '🔴';
+                } else if (priority.toLowerCase().includes('trung bình')) {
+                    priorityIcon = '🟡';
+                } else if (priority.toLowerCase().includes('thấp')) {
+                    priorityIcon = '🟢';
+                }
+
+                markdown += `**${index + 1}. ${item.task}**\n`;
+                markdown += `* Người Phụ Trách: **${item.owner || 'Chưa xác định'}**\n`;
+                markdown += `* Ưu Tiên: ${priorityIcon} ${priority}\n\n`;
+            });
+
+            return markdown;
+        }
+
+        // Hàm chuyển đổi kết quả JSON (Rủi ro/Cơ hội) thành chuỗi Markdown
+        function formatRiskOppToMarkdown(data) {
+            let markdown = `## ✨ Phân Tích Rủi Ro và Cơ Hội\n\n`;
+
+            // 1. Rủi Ro
+            markdown += `### ⚠️ Rủi Ro và Thách Thức Tiềm Ẩn\n\n`;
+            if (data.risks && data.risks.length > 0) {
+                data.risks.forEach((item, index) => {
+                    markdown += `**${index + 1}. Rủi ro:** ${item.risk_description}\n`;
+                    markdown += `* **Đề xuất giảm thiểu:** ${item.mitigation_suggestion}\n\n`;
+                });
+            } else {
+                markdown += `* Không tìm thấy rủi ro/thách thức rõ ràng nào được đề cập.\n\n`;
+            }
+
+            // 2. Cơ Hội
+            markdown += `### 🚀 Cơ Hội và Bước Tiến Tích Cực\n\n`;
+            if (data.opportunities && data.opportunities.length > 0) {
+                data.opportunities.forEach((item, index) => {
+                    markdown += `**${index + 1}. Cơ hội:** ${item.opportunity_description}\n`;
+                    markdown += `* **Đề xuất khai thác:** ${item.action_suggestion}\n\n`;
+                });
+            } else {
+                markdown += `* Không tìm thấy cơ hội tiềm năng nào được đề xuất.\n\n`;
+            }
+
+            return markdown;
+        }
+
+
+        // Hàm hiển thị kết quả chung
+        function displayResult(markdownContent) {
+            const outputContainer = document.getElementById('output-container');
+            const copyButton = document.getElementById('copy-button');
+            
+            outputContainer.innerHTML = marked.parse(markdownContent);
+            outputContainer.setAttribute('data-markdown-content', markdownContent);
+            copyButton.classList.remove('hidden');
+            showMessage('Phân tích thành công! Dưới đây là kết quả.', 'success');
+        }
+
+
+        // --- MAIN LLM FEATURES ---
+
+        // CHỨC NĂNG 1: Gợi Ý Thảo Luận (Sử dụng JSON Schema)
+        window.generateDiscussionPoints = async function() {
+            const notes = document.getElementById('meeting-notes').value.trim();
+            const buttonId = 'generate-discussion-button';
+            
+            if (!notes) {
+                showMessage('Vui lòng nhập nội dung biên bản họp.', 'error');
+                return;
+            }
+
+            setLoadingState(buttonId, true, 'Phân Tích & Gợi Ý Thảo Luận');
+            hideMessage();
+
+            const outputContainer = document.getElementById('output-container');
+            outputContainer.innerHTML = '<div class="loader m-8 w-8 h-8"></div><p class="text-center text-gray-500 mt-4">Đang phân tích và xây dựng cấu trúc gợi ý...</p>';
+
+            const systemPrompt = `Bạn là "GỢI Ý THẢO LUẬN" (Discussion Suggestion Assistant), vai trò của bạn là phân tích biên bản cuộc họp do người dùng cung cấp và tạo ra các điểm thảo luận có cấu trúc.
+            Mục tiêu là giúp người dùng hiểu nhanh, triển khai nội dung rõ ràng, và xây dựng cuộc thảo luận hợp lý.
+            Ngôn ngữ sử dụng phải là tiếng Việt, đơn giản, dễ hiểu, phù hợp nhiều đối tượng.
+
+            Yêu cầu về Cấu trúc Phản hồi:
+            1. Xác định rõ các ý chính, góc nhìn, vấn đề trọng tâm bao quát toàn bộ nội dung.
+            2. Tạo 3-5 gợi ý thảo luận (discussion points) cho MỖI nhóm vấn đề lớn được xác định.
+            3. Mỗi gợi ý thảo luận PHẢI gồm 2 phần: (1) Từ khóa hoặc ý chính ngắn gọn. (2) Giải thích ngắn (chỉ 1 câu): "Tại sao cần bàn luận điểm này."
+            4. Kết thúc bằng một câu hỏi mở để khuyến khích người dùng chọn hoặc mở rộng ý.
+
+            Bạn PHẢI trả lời dưới dạng JSON tuân thủ schema đã định nghĩa.
+            `;
+            
+            const userPrompt = `Phân tích biên bản cuộc họp sau và tạo các điểm thảo luận có cấu trúc theo yêu cầu:
+            ---
+            ${notes}
+            ---
+            `;
+
+            try {
+                const jsonResponse = await callGeminiApiJson(userPrompt, DISCUSSION_SCHEMA, systemPrompt);
+                const markdownResult = formatDiscussionResultToMarkdown(jsonResponse);
+                displayResult(markdownResult);
+
+            } catch (error) {
+                console.error("Lỗi Gemini API:", error);
+                showMessage(`Lỗi trong quá trình phân tích: ${error.message}. Vui lòng thử lại.`, 'error');
+                outputContainer.innerHTML = '<p class="text-red-500 italic p-4">Đã xảy ra lỗi. Vui lòng kiểm tra console log để biết chi tiết.</p>';
+            } finally {
+                setLoadingState(buttonId, false, 'Phân Tích & Gợi Ý Thảo Luận');
+            }
+        };
+
+
+        // CHỨC NĂNG 2: TÓM TẮT NHANH (Sử dụng Text response)
+        window.generateSummary = async function() {
+            const notes = document.getElementById('meeting-notes').value.trim();
+            const buttonId = 'generate-summary-button';
+
+            if (!notes) {
+                showMessage('Vui lòng nhập nội dung biên bản họp.', 'error');
+                return;
+            }
+
+            setLoadingState(buttonId, true, '✨ Tóm Tắt Nhanh (1 Đoạn)');
+            hideMessage();
+
+            const outputContainer = document.getElementById('output-container');
+            outputContainer.innerHTML = '<div class="loader m-8 w-8 h-8 bg-fuchsia-600 border-t-fuchsia-600"></div><p class="text-center text-gray-500 mt-4">Đang tóm tắt biên bản...</p>';
+
+            const systemPrompt = `Bạn là chuyên gia tóm tắt. Nhiệm vụ của bạn là đọc biên bản cuộc họp và tạo ra một đoạn văn ngắn (tối đa 5 câu) tóm tắt các quyết định và yêu cầu hành động quan trọng nhất. Phản hồi phải là tiếng Việt và chỉ chứa đoạn tóm tắt.`;
+            const userPrompt = `Tóm tắt nội dung sau thành một đoạn văn ngắn gọn:
+            ---
+            ${notes}
+            ---
+            `;
+
+            try {
+                const textResponse = await callGeminiApiText(userPrompt, systemPrompt);
+                const markdownResult = `## ✨ Tóm Tắt Nhanh Biên Bản\n\n${textResponse}`;
+                displayResult(markdownResult);
+
+            } catch (error) {
+                console.error("Lỗi Gemini API:", error);
+                showMessage(`Lỗi trong quá trình tóm tắt: ${error.message}. Vui lòng thử lại.`, 'error');
+                outputContainer.innerHTML = '<p class="text-red-500 italic p-4">Đã xảy ra lỗi. Vui lòng kiểm tra console log để biết chi tiết.</p>';
+            } finally {
+                setLoadingState(buttonId, false, '✨ Tóm Tắt Nhanh (1 Đoạn)');
+            }
+        };
+
+        // CHỨC NĂNG 3: ĐỀ XUẤT AGENDA MẪU (Sử dụng Text response)
+        window.generateAgendaDraft = async function() {
+            const notes = document.getElementById('meeting-notes').value.trim();
+            const buttonId = 'generate-agenda-button';
+
+            if (!notes) {
+                showMessage('Vui lòng nhập nội dung biên bản họp.', 'error');
+                return;
+            }
+
+            setLoadingState(buttonId, true, '✨ Đề Xuất Agenda Mẫu');
+            hideMessage();
+
+            const outputContainer = document.getElementById('output-container');
+            outputContainer.innerHTML = '<div class="loader m-8 w-8 h-8 bg-sky-600 border-t-sky-600"></div><p class="text-center text-gray-500 mt-4">Đang xây dựng bản nháp agenda...</p>';
+
+            const systemPrompt = `Bạn là trợ lý tổ chức cuộc họp chuyên nghiệp. Nhiệm vụ của bạn là xây dựng một bản nháp agenda chi tiết dựa trên các vấn đề trong biên bản cuộc họp được cung cấp. Agenda phải được trình bày bằng Markdown với các mục, thời gian dự kiến (5-15 phút cho mỗi mục) và người phụ trách nếu có thể suy luận.`;
+            const userPrompt = `Tạo một bản nháp Agenda cuộc họp dựa trên các vấn đề sau. Đặt tên cuộc họp là "Cuộc họp Triển khai và Kiểm tra công tác Quý 4":
+            ---
+            ${notes}
+            ---
+            `;
+
+            try {
+                const textResponse = await callGeminiApiText(userPrompt, systemPrompt);
+                const markdownResult = `## ✨ Bản Nháp Agenda Chi Tiết\n\n${textResponse}`;
+                displayResult(markdownResult);
+
+            } catch (error) {
+                console.error("Lỗi Gemini API:", error);
+                showMessage(`Lỗi trong quá trình tạo agenda: ${error.message}. Vui lòng thử lại.`, 'error');
+                outputContainer.innerHTML = '<p class="text-red-500 italic p-4">Đã xảy ra lỗi. Vui lòng kiểm tra console log để biết chi tiết.</p>';
+            } finally {
+                setLoadingState(buttonId, false, '✨ Đề Xuất Agenda Mẫu');
+            }
+        };
+        
+        // CHỨC NĂNG 4: TRÍCH XUẤT MỤC HÀNH ĐỘNG (Sử dụng JSON Schema)
+        window.generateActionItems = async function() {
+            const notes = document.getElementById('meeting-notes').value.trim();
+            const buttonId = 'generate-action-button';
+
+            if (!notes) {
+                showMessage('Vui lòng nhập nội dung biên bản họp.', 'error');
+                return;
+            }
+
+            setLoadingState(buttonId, true, '✨ Trích Xuất Hành Động & Người Phụ Trách');
+            hideMessage();
+
+            const outputContainer = document.getElementById('output-container');
+            outputContainer.innerHTML = '<div class="loader m-8 w-8 h-8" style="border-top-color: #ea580c;"></div><p class="text-center text-gray-500 mt-4">Đang trích xuất và phân loại các mục hành động...</p>';
+
+            const systemPrompt = `Bạn là trợ lý quản lý dự án. Nhiệm vụ của bạn là phân tích biên bản cuộc họp, trích xuất tất cả các mục hành động (action items) rõ ràng và ngầm định, xác định người chịu trách nhiệm và đánh giá mức độ ưu tiên.
+            Phản hồi PHẢI là một mảng JSON tuân thủ schema đã định nghĩa. Ngôn ngữ sử dụng PHẢI là tiếng Việt.`;
+            
+            const userPrompt = `Trích xuất tất cả các mục hành động, người phụ trách và mức độ ưu tiên (Cao, Trung bình, Thấp) từ biên bản sau:
+            ---
+            ${notes}
+            ---
+            `;
+
+            try {
+                const jsonResponse = await callGeminiApiJson(userPrompt, ACTION_ITEM_SCHEMA, systemPrompt);
+                const markdownResult = formatActionItemsToMarkdown(jsonResponse);
+                displayResult(markdownResult);
+
+            } catch (error) {
+                console.error("Lỗi Gemini API:", error);
+                showMessage(`Lỗi trong quá trình trích xuất hành động: ${error.message}. Vui lòng thử lại.`, 'error');
+                outputContainer.innerHTML = '<p class="text-red-500 italic p-4">Đã xảy ra lỗi. Vui lòng kiểm tra console log để biết chi tiết.</p>';
+            } finally {
+                setLoadingState(buttonId, false, '✨ Trích Xuất Hành Động & Người Phụ Trách');
+            }
+        };
+        
+        // CHỨC NĂNG 5: SOẠN THẢO EMAIL TÓM TẮT (Sử dụng Text response)
+        window.generateFollowupEmail = async function() {
+            const notes = document.getElementById('meeting-notes').value.trim();
+            const buttonId = 'generate-email-button';
+
+            if (!notes) {
+                showMessage('Vui lòng nhập nội dung biên bản họp.', 'error');
+                return;
+            }
+
+            setLoadingState(buttonId, true, '✨ Soạn Thảo Email Tóm Tắt');
+            hideMessage();
+
+            const outputContainer = document.getElementById('output-container');
+            outputContainer.innerHTML = '<div class="loader m-8 w-8 h-8" style="border-top-color: #4f46e5;"></div><p class="text-center text-gray-500 mt-4">Đang soạn bản nháp email...</p>';
+
+            const systemPrompt = `Bạn là trợ lý hành chính cấp cao. Nhiệm vụ của bạn là soạn một bản nháp email chuyên nghiệp, gửi cho tất cả người tham gia cuộc họp. Email PHẢI bao gồm các phần sau, sử dụng định dạng Markdown:
+            1. Tiêu đề Email (Subject): Ngắn gọn, nêu bật mục đích (ví dụ: [TÓM TẮT] - Cuộc họp [Tên dự án] - [Ngày]).
+            2. Thân bài: Cảm ơn sự tham gia và tóm tắt ngắn các quyết định chính.
+            3. Mục Hành Động (Action Items): Liệt kê các nhiệm vụ, người phụ trách và thời hạn (nếu có thể suy luận).
+            4. Mục Tiếp Theo: Đề xuất ngày/giờ cho cuộc họp tiếp theo (hoặc thông báo sẽ cập nhật sau).
+
+            Sử dụng tiếng Việt trang trọng, lịch sự.`;
+            
+            const userPrompt = `Dựa trên biên bản họp sau, soạn một bản nháp email tổng kết:
+            ---
+            ${notes}
+            ---
+            `;
+
+            try {
+                const textResponse = await callGeminiApiText(userPrompt, systemPrompt);
+                const markdownResult = `## ✨ Bản Nháp Email Tóm Tắt Cuộc Họp\n\n${textResponse}`;
+                displayResult(markdownResult);
+
+            } catch (error) {
+                console.error("Lỗi Gemini API:", error);
+                showMessage(`Lỗi trong quá trình soạn email: ${error.message}. Vui lòng thử lại.`, 'error');
+                outputContainer.innerHTML = '<p class="text-red-500 italic p-4">Đã xảy ra lỗi. Vui lòng kiểm tra console log để biết chi tiết.</p>';
+            } finally {
+                setLoadingState(buttonId, false, '✨ Soạn Thảo Email Tóm Tắt');
+            }
+        };
+
+        // CHỨC NĂNG 6: PHÂN TÍCH RỦI RO & CƠ HỘI (Sử dụng JSON Schema)
+        window.analyzeRisksAndOpportunities = async function() {
+            const notes = document.getElementById('meeting-notes').value.trim();
+            const buttonId = 'generate-risk-button';
+
+            if (!notes) {
+                showMessage('Vui lòng nhập nội dung biên bản họp.', 'error');
+                return;
+            }
+
+            setLoadingState(buttonId, true, '✨ Phân Tích Rủi Ro & Cơ Hội');
+            hideMessage();
+
+            const outputContainer = document.getElementById('output-container');
+            outputContainer.innerHTML = '<div class="loader m-8 w-8 h-8" style="border-top-color: #0d9488;"></div><p class="text-center text-gray-500 mt-4">Đang phân tích rủi ro và cơ hội...</p>';
+
+            const systemPrompt = `Bạn là cố vấn chiến lược. Nhiệm vụ của bạn là đọc và phân tích biên bản cuộc họp, trích xuất và phân loại một cách rõ ràng các Rủi ro (Risks) hoặc Thách thức (Challenges) tiềm ẩn và các Cơ hội (Opportunities) hoặc Bước tiếp theo tích cực.
+            Mỗi Rủi ro PHẢI đi kèm với một Đề xuất giảm thiểu (Mitigation Suggestion) ngắn gọn.
+            Mỗi Cơ hội PHẢI đi kèm với một Đề xuất khai thác (Action Suggestion) ngắn gọn.
+            Phản hồi PHẢI là một đối tượng JSON tuân thủ schema đã định nghĩa. Ngôn ngữ sử dụng PHẢI là tiếng Việt.`;
+            
+            const userPrompt = `Phân tích biên bản cuộc họp sau để xác định Rủi ro và Cơ hội tiềm ẩn.
+            ---
+            ${notes}
+            ---
+            `;
+
+            try {
+                const jsonResponse = await callGeminiApiJson(userPrompt, RISK_OPP_SCHEMA, systemPrompt);
+                const markdownResult = formatRiskOppToMarkdown(jsonResponse);
+                displayResult(markdownResult);
+
+            } catch (error) {
+                console.error("Lỗi Gemini API:", error);
+                showMessage(`Lỗi trong quá trình phân tích rủi ro/cơ hội: ${error.message}. Vui lòng thử lại.`, 'error');
+                outputContainer.innerHTML = '<p class="text-red-500 italic p-4">Đã xảy ra lỗi. Vui lòng kiểm tra console log để biết chi tiết.</p>';
+            } finally {
+                setLoadingState(buttonId, false, '✨ Phân Tích Rủi Ro & Cơ Hội');
+            }
+        };
+
+
+        // Hàm sao chép nội dung đã định dạng Markdown
+        window.copyToClipboard = function() {
+            const outputContainer = document.getElementById('output-container');
+            const markdownContent = outputContainer.getAttribute('data-markdown-content');
+            
+            if (markdownContent) {
+                // Dùng document.execCommand('copy') để đảm bảo hoạt động trong iFrame
+                const tempTextArea = document.createElement("textarea");
+                tempTextArea.value = markdownContent;
+                document.body.appendChild(tempTextArea);
+                tempTextArea.select();
+                try {
+                    document.execCommand('copy');
+                    showMessage('Đã sao chép nội dung (Markdown) vào clipboard!', 'success');
+                } catch (err) {
+                    console.error('Không thể sao chép: ', err);
+                    showMessage('Không thể sao chép. Vui lòng sao chép thủ công.', 'error');
+                }
+                document.body.removeChild(tempTextArea);
+            } else {
+                showMessage('Không có nội dung để sao chép.', 'error');
+            }
+        }
+    </script>
+</body>
+</html>
