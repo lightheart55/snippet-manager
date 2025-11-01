@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trợ lý Biên tập Biên bản Họp</title>
+    <!-- Tải Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tải thư viện Marked.js để render Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        /* Sử dụng font Inter cho toàn bộ trang */
+        body {
+            font-family: "Inter", sans-serif;
+        }
+        /* Tùy chỉnh thanh cuộn cho đẹp hơn */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        /* CSS cho spinner loading */
+        .loader {
+            width: 48px;
+            height: 48px;
+            border: 5px solid #FFF;
+            border-bottom-color: #FF3D00;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+        }
+        @keyframes rotation {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 md:p-8">
+    <div class="max-w-7xl mx-auto">
+        <!-- TIÊU ĐỀ -->
+        <header class="mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800">Trợ lý Biên tập Biên bản Họp</h1>
+            <p class="text-gray-600 mt-1">Dán nội dung họp thô để biên tập lại theo chuẩn hành chính.</p>
+        </header>
+
+        <!-- NỘI DUNG CHÍNH: HAI CỘT -->
+        <main class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            <!-- CỘT BÊN TRÁI: NHẬP LIỆU -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <label for="raw-input" class="text-lg font-semibold text-gray-700">Nội dung họp thô:</label>
+                <textarea id="raw-input"
+                    class="w-full h-96 md:h-[60vh] mt-4 p-4 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Dán nội dung ghi chú, gạch đầu dòng, tường thuật lộn xộn của bạn vào đây..."></textarea>
+                
+                <!-- KHỐI NÚT CHỨC NĂNG -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <!-- Nút Biên tập & Chuẩn hóa -->
+                    <button id="format-button"
+                        class="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold text-lg hover:bg-blue-700 transition duration-300 flex items-center justify-center space-x-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        <span>Biên tập & Chuẩn hóa</span>
+                    </button>
+
+                    <!-- Nút Trích xuất Đầu việc -->
+                    <button id="extract-tasks-button"
+                        class="w-full bg-orange-600 text-white py-3 px-6 rounded-lg font-semibold text-lg hover:bg-orange-700 transition duration-300 flex items-center justify-center space-x-2" style="display: none;">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                        </svg>
+                        <span>✨ Trích xuất Đầu việc</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- CỘT BÊN PHẢI: XUẤT LIỆU -->
+            <div class="bg-gray-800 text-white p-6 rounded-lg shadow-md">
+                <!-- Tabs điều khiển -->
+                <div class="flex border-b border-gray-700 mb-4">
+                    <button id="tab-preview" class="py-2 px-4 font-semibold text-white border-b-2 border-blue-500">Xem trước</button>
+                    <button id="tab-markdown" class="py-2 px-4 font-semibold text-gray-400">Markdown</button>
+                    <button id="copy-button" class="ml-auto py-2 px-4 bg-gray-700 hover:bg-gray-600 rounded-md text-sm font-medium flex items-center space-x-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        <span>Sao chép</span>
+                    </button>
+                </div>
+                
+                <!-- Vùng hiển thị nội dung -->
+                <div id="output-container" class="relative w-full h-96 md:h-[60vh] overflow-y-auto">
+                    <!-- Tab Xem trước -->
+                    <div id="preview-output" class="prose prose-invert max-w-none p-2">
+                        <p class="text-gray-400">Nội dung biên tập sẽ xuất hiện ở đây...</p>
+                    </div>
+                    <!-- Tab Mã Markdown -->
+                    <pre id="markdown-output" class="p-2 whitespace-pre-wrap break-words" style="display: none;"></pre>
+
+                    <!-- Lớp phủ Loading -->
+                    <div id="loading-overlay" class="absolute inset-0 bg-gray-800 bg-opacity-75 flex flex-col items-center justify-center rounded-lg" style="display: none;">
+                        <div class="loader"></div>
+                        <p class="text-white text-lg font-semibold mt-4">Đang biên tập...</p>
+                    </div>
+                    <!-- Thông báo sao chép -->
+                    <div id="copy-success" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-green-500 text-white py-2 px-4 rounded-lg shadow-lg font-semibold" style="display: none;">
+                        Đã sao chép!
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Task Extraction Modal -->
+    <div id="task-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+            <!-- Modal Header -->
+            <div class="p-6 border-b flex justify-between items-center bg-gray-50">
+                <h2 class="text-2xl font-bold text-gray-800 flex items-center space-x-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                    </svg>
+                    <span>Kết quả Trích xuất Đầu việc</span>
+                </h2>
+                <button id="close-modal" class="text-gray-400 hover:text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Modal Body (Content) -->
+            <div id="task-list-container" class="p-6 overflow-y-auto flex-grow relative">
+                <!-- Nội dung kết quả sẽ được chèn vào đây -->
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 border-t flex justify-end bg-gray-50">
+                <button id="copy-tasks-button" class="bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition duration-300 flex items-center space-x-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <span>Sao chép Đầu việc</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Định nghĩa vai trò hệ thống cho AI - Biên tập
+        const systemPrompt = `Bạn là Trợ lý biên tập biên bản họp chuyên nghiệp, hiểu ngôn ngữ hội họp hành chính Việt Nam, giọng lãnh đạo, nghiêm túc, rõ ràng, có điểm nhấn và đúng tinh thần phát biểu trong các cuộc họp ngành y tế.
+Nhiệm vụ:
+Khi tôi nhập nội dung thô (dạng gạch đầu dòng, tường thuật, lời nói ngắn, ghi chú lộn xộn), bạn phải biên soạn lại thành bản biên bản họp chuẩn hành chính, rõ ràng, có thể dùng để in hoặc lưu hành nội bộ.
+Cấu trúc bắt buộc:
+**Mục tiêu cuộc họp**
+* Tóm tắt 1–2 ý ngắn gọn nêu mục tiêu hoặc trọng tâm buổi họp.
+* Viết bằng dấu “•”, không giải thích dài dòng.
+**[Tên người phát biểu] – [Chức vụ / Lĩnh vực phụ trách]**
+* Viết lại phát biểu của người này theo giọng hành chính – lãnh đạo – nghiêm túc, dùng câu ngắn, dứt khoát.
+* Mỗi ý chính trình bày trên một dòng riêng, có thể dùng “–” hoặc “•” đầu dòng.
+* Nhấn mạnh nội dung quan trọng bằng chữ **đậm** (ví dụ: **phải làm ngay**, **không để chậm**, **rút kinh nghiệm**, **báo cáo kịp thời**…).
+* Nếu có yêu cầu, đề nghị, hoặc phê bình, thể hiện rõ ràng bằng ngữ điệu chỉ đạo.
+Sau mỗi người phát biểu, chèn một đường phân cách:
+________________________________________
+Quy tắc trình bày:
+* Dạng Markdown.
+* Không thêm tiêu đề thừa như “Biên bản”, “Nội dung họp”.
+* Không sáng tạo ngoài nội dung gốc, chỉ chuyển hóa lời nói thô thành văn bản hành chính rõ ràng.
+* Giữ phong cách trang trọng, mạch lạc, dễ nhìn, đọc hiểu ngay.
+* Không thêm “Kết luận” hay “Tổng kết” nếu nội dung không có.
+* Nếu có người chủ trì, ghi phần cuối:
+**[Tên người – Chủ trì cuộc họp]**, trình bày theo giọng quán triệt – giao việc – nhấn trọng tâm.`;
+        
+        // Định nghĩa vai trò hệ thống cho AI - Trích xuất Đầu việc
+        const taskExtractionSystemPrompt = `Bạn là hệ thống trích xuất thông tin chuyên nghiệp. Nhiệm vụ của bạn là đọc biên bản họp đã được biên tập và trích xuất tất cả các đầu việc, người phụ trách và thời hạn liên quan.
+Quy tắc:
+1. Chỉ trích xuất những mục có tính chất LÀM VIỆC/HÀNH ĐỘNG/GIAO VIỆC rõ ràng.
+2. Thời hạn (deadline) có thể là ngày tháng cụ thể hoặc mô tả tương đối (ví dụ: 'ngay lập tức', 'cuối tuần này'). Nếu không có thời hạn rõ ràng, ghi 'Chưa xác định'.
+3. Người phụ trách (assignee) phải là tên người hoặc phòng ban cụ thể. Nếu không rõ, ghi 'Chưa xác định'.
+4. Đảm bảo phản hồi luôn ở định dạng JSON hợp lệ theo schema yêu cầu.`;
+
+        // Định nghĩa Schema JSON cho đầu việc
+        const taskSchema = {
+            type: "ARRAY",
+            items: {
+                type: "OBJECT",
+                properties: {
+                    "task": { "type": "STRING", "description": "Tóm tắt công việc cần làm." },
+                    "assignee": { "type": "STRING", "description": "Người hoặc phòng ban phụ trách." },
+                    "deadline": { "type": "STRING", "description": "Thời hạn hoàn thành." }
+                },
+                "propertyOrdering": ["task", "assignee", "deadline"]
+            }
+        };
+
+
+        // Lấy các phần tử DOM
+        const formatButton = document.getElementById('format-button');
+        const rawInput = document.getElementById('raw-input');
+        const previewOutput = document.getElementById('preview-output');
+        const markdownOutput = document.getElementById('markdown-output');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const copyButton = document.getElementById('copy-button');
+        const copySuccess = document.getElementById('copy-success');
+        const tabPreview = document.getElementById('tab-preview');
+        const tabMarkdown = document.getElementById('tab-markdown');
+        const extractTasksButton = document.getElementById('extract-tasks-button');
+        const taskModal = document.getElementById('task-modal');
+        const closeModal = document.getElementById('close-modal');
+        const taskListContainer = document.getElementById('task-list-container');
+        const copyTasksButton = document.getElementById('copy-tasks-button');
+
+        let formattedText = ""; // Biến lưu trữ văn bản đã định dạng
+        let extractedTasks = []; // Biến lưu trữ danh sách đầu việc đã trích xuất
+
+        // Xử lý chuyển tab
+        tabPreview.addEventListener('click', () => {
+            previewOutput.style.display = 'block';
+            markdownOutput.style.display = 'none';
+            tabPreview.classList.add('border-blue-500', 'text-white');
+            tabPreview.classList.remove('text-gray-400');
+            tabMarkdown.classList.remove('border-blue-500', 'text-white');
+            tabMarkdown.classList.add('text-gray-400');
+        });
+
+        tabMarkdown.addEventListener('click', () => {
+            previewOutput.style.display = 'none';
+            markdownOutput.style.display = 'block';
+            tabMarkdown.classList.add('border-blue-500', 'text-white');
+            tabMarkdown.classList.remove('text-gray-400');
+            tabPreview.classList.remove('border-blue-500', 'text-white');
+            tabPreview.classList.add('text-gray-400');
+        });
+
+        // Hàm tiện ích để sao chép văn bản
+        function copyTextToClipboard(text, successElement) {
+            if (!text) return;
+            
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                // Hiển thị thông báo thành công
+                successElement.style.display = 'block';
+                setTimeout(() => {
+                    successElement.style.display = 'none';
+                }, 1500);
+            } catch (err) {
+                console.error('Không thể sao chép:', err);
+                alert('Không thể sao chép. Vui lòng sao chép thủ công.');
+            }
+            document.body.removeChild(textarea);
+        }
+
+        // Xử lý sao chép biên bản đã biên tập
+        copyButton.addEventListener('click', () => {
+            copyTextToClipboard(formattedText, copySuccess);
+        });
+
+        // Xử lý sao chép danh sách đầu việc
+        copyTasksButton.addEventListener('click', () => {
+            if (extractedTasks.length === 0) return;
+            
+            // Format tasks to a readable, copyable list
+            let copyText = "Danh sách Đầu việc:\n\n";
+            extractedTasks.forEach((task, index) => {
+                copyText += `${index + 1}. Công việc: ${task.task || 'Không có mô tả'}\n`;
+                copyText += `   - Người phụ trách: ${task.assignee || 'Chưa xác định'}\n`;
+                copyText += `   - Thời hạn: ${task.deadline || 'Chưa xác định'}\n`;
+                copyText += `---\n`;
+            });
+
+            // Tạo một thông báo thành công tạm thời cho modal
+            const taskCopySuccess = document.createElement('div');
+            taskCopySuccess.className = 'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-green-500 text-white py-2 px-4 rounded-lg shadow-lg font-semibold transition-opacity duration-300';
+            taskCopySuccess.textContent = 'Đã sao chép danh sách đầu việc!';
+            taskCopySuccess.style.opacity = 0;
+            taskListContainer.appendChild(taskCopySuccess);
+            
+            setTimeout(() => {
+                taskCopySuccess.style.opacity = 1;
+            }, 10);
+            
+            copyTextToClipboard(copyText, taskCopySuccess);
+
+            setTimeout(() => {
+                taskCopySuccess.style.opacity = 0;
+                taskCopySuccess.remove();
+            }, 1500);
+
+        });
+
+        // Xử lý sự kiện nhấp nút "Biên tập"
+        formatButton.addEventListener('click', async () => {
+            const userQuery = rawInput.value;
+            if (!userQuery.trim()) {
+                previewOutput.innerHTML = '<p class="text-yellow-400">Vui lòng nhập nội dung thô trước khi biên tập.</p>';
+                extractTasksButton.style.display = 'none';
+                return;
+            }
+
+            loadingOverlay.style.display = 'flex'; // Hiện loading
+            formatButton.disabled = true;
+            extractTasksButton.disabled = true;
+            extractTasksButton.style.display = 'none';
+
+            try {
+                const result = await callGeminiAPI(systemPrompt, userQuery);
+                formattedText = result; // Lưu kết quả
+
+                // Hiển thị ở cả hai tab
+                previewOutput.innerHTML = marked.parse(result); // Render HTML
+                markdownOutput.textContent = result; // Hiển thị mã Markdown thô
+                
+                // Tự động chuyển sang tab xem trước
+                tabPreview.click();
+                extractTasksButton.style.display = 'flex'; // Hiện nút trích xuất
+
+            } catch (error) {
+                console.error('Lỗi khi gọi API Biên tập:', error);
+                previewOutput.innerHTML = `<p class="text-red-400">Đã xảy ra lỗi khi biên tập. Vui lòng thử lại. Lỗi: ${error.message}</p>`;
+                extractedTasksButton.style.display = 'none';
+
+            } finally {
+                loadingOverlay.style.display = 'none'; // Ẩn loading
+                formatButton.disabled = false;
+                extractTasksButton.disabled = false;
+            }
+        });
+
+        // Hàm render danh sách đầu việc ra HTML
+        function renderTasks(tasks) {
+            if (!tasks || tasks.length === 0) {
+                return '<p class="text-gray-700">Không tìm thấy đầu việc nào có tính chất hành động rõ ràng trong biên bản.</p>';
+            }
+
+            let html = `
+                <div class="space-y-4">
+                    <div class="grid grid-cols-12 font-bold text-gray-700 border-b pb-3 text-sm md:text-base">
+                        <div class="col-span-6 pl-2">Đầu việc</div>
+                        <div class="col-span-3">Người phụ trách</div>
+                        <div class="col-span-3">Thời hạn</div>
+                    </div>
+            `;
+
+            tasks.forEach((task, index) => {
+                // Simple sanitization for display
+                const taskText = task.task || 'Không có mô tả';
+                const assigneeText = task.assignee || 'Chưa xác định';
+                const deadlineText = task.deadline || 'Chưa xác định';
+
+                html += `
+                    <div class="grid grid-cols-12 py-3 border-b border-gray-100 hover:bg-gray-50 transition duration-150 rounded-lg">
+                        <div class="col-span-6 text-sm text-gray-800 font-medium pl-2">${index + 1}. ${taskText}</div>
+                        <div class="col-span-3 text-xs text-gray-600">${assigneeText}</div>
+                        <div class="col-span-3 text-xs text-gray-600">${deadlineText}</div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            return html;
+        }
+
+        // Xử lý sự kiện nhấp nút "Trích xuất Đầu việc"
+        extractTasksButton.addEventListener('click', async () => {
+            if (!formattedText.trim()) {
+                alert('Vui lòng Biên tập & Chuẩn hóa biên bản trước.');
+                return;
+            }
+
+            // Hiển thị modal và loading
+            taskModal.style.display = 'flex';
+            taskListContainer.innerHTML = `
+                <div class="flex flex-col items-center justify-center min-h-[300px]">
+                    <div class="loader"></div>
+                    <p class="text-gray-700 text-lg font-semibold mt-4">Đang trích xuất đầu việc...</p>
+                    <p class="text-sm text-gray-500 mt-2">Quá trình này có thể mất vài giây.</p>
+                </div>
+            `;
+            copyTasksButton.disabled = true;
+
+            try {
+                // Gọi API với JSON schema
+                const jsonResult = await callGeminiAPI(taskExtractionSystemPrompt, formattedText, taskSchema);
+                extractedTasks = jsonResult; // Lưu kết quả JSON
+
+                // Render kết quả ra modal
+                taskListContainer.innerHTML = renderTasks(extractedTasks);
+                copyTasksButton.disabled = false;
+
+            } catch (error) {
+                console.error('Lỗi khi gọi API Trích xuất Đầu việc:', error);
+                taskListContainer.innerHTML = `
+                    <p class="text-red-500 font-semibold">Đã xảy ra lỗi khi trích xuất:</p>
+                    <p class="text-sm text-gray-700 mt-2">Không thể kết nối đến dịch vụ AI hoặc dữ liệu không hợp lệ. Vui lòng thử lại sau.</p>
+                    <p class="text-xs text-gray-400 mt-1">${error.message}</p>
+                `;
+                copyTasksButton.disabled = true;
+            }
+        });
+
+        // Xử lý đóng modal
+        closeModal.addEventListener('click', () => {
+            taskModal.style.display = 'none';
+        });
+
+        // Hàm gọi Gemini API (hỗ trợ cả text và JSON schema) với xử lý retry
+        async function callGeminiAPI(systemPrompt, userQuery, responseSchema = null, retries = 3, delay = 1000) {
+            const apiKey = ""; // Canvas sẽ tự động thêm key
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            
+            const payload = {
+                contents: [{
+                    parts: [{ text: userQuery }]
+                }],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+            };
+
+            if (responseSchema) {
+                payload.generationConfig = {
+                    responseMimeType: "application/json",
+                    responseSchema: responseSchema
+                };
+            }
+
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+                    const partText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    
+                    if (partText) {
+                        if (responseSchema) {
+                            try {
+                                return JSON.parse(partText);
+                            } catch (e) {
+                                console.error("Lỗi Parsing JSON:", partText);
+                                throw new Error('Phản hồi không phải là JSON hợp lệ.');
+                            }
+                        } else {
+                            return partText;
+                        }
+                    } else {
+                        throw new Error('Định dạng phản hồi API không hợp lệ hoặc nội dung trống.');
+                    }
+
+                } catch (error) {
+                    console.warn(`Lỗi API (lần ${i + 1}):`, error.message);
+                    if (i === retries - 1) { // Lần thử cuối cùng
+                        throw error; // Ném lỗi ra ngoài
+                    }
+                    await new Promise(resolve => setTimeout(resolve, delay)); // Chờ
+                    delay *= 2; // Tăng gấp đôi thời gian chờ
+                }
+            }
+        }
+    </script>
+</body>
+</html>
